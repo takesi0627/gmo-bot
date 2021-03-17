@@ -42,7 +42,7 @@ def check_server_status():
 
 @tl.job(interval=timedelta(minutes=1))
 def monitoring():
-    bot.chart.print_candles_by_index()
+    bot.chart.print_candles_by_index(-20)
 
 if __name__ == '__main__':
     if len(sys.argv) < 2:

@@ -12,7 +12,7 @@ class TrendChecker:
 
 class SimpleTrendChecker(TrendChecker):
     CHECK_LENGTH = 3
-    START_COOL_TIME = 10
+    START_COOL_TIME = 5
     def check_trend(self, chart: TechnicalChart) -> ETrendType:
         if len(chart.avg_candles) < self.START_COOL_TIME:
             return ETrendType.NONE

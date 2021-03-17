@@ -252,7 +252,6 @@ class GMOCoinBot:
             lossGain = int(execution_data['lossGain'])
             if lossGain > 0:
                 self.win_num += 1
-                self._prev_entry_time = None # 利益出た時だけ追加注文する
             self.trade_num += 1
             self.profit_sum += lossGain
             close_pos = self.get_position(execution_data['positionId'])
@@ -260,6 +259,8 @@ class GMOCoinBot:
                 self._position_list.remove(close_pos)
                 close_pos.lossGain = lossGain
                 self.report(close_pos)
+
+            self._prev_entry_time = None
 
     def on_order_events(self, order_data):
         order_id = int(order_data['orderId'])
