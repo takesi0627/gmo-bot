@@ -65,7 +65,7 @@ class TechnicalChart:
             self.rsi = self.gain_avg / (self.gain_avg + self.loss_avg) * 100
 
     def print_candles_by_index(self, from_idx=0, to_idx=-1):
-        if (to_idx - from_idx) < len(self.avg_candles):
+        if (to_idx - from_idx) > len(self.avg_candles):
             from_idx = 0
             to_idx = -1
         self.print_candles(list(self.avg_candles)[from_idx], list(self.avg_candles)[to_idx])
