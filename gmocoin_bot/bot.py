@@ -100,7 +100,13 @@ class GMOCoinBot:
 
         # 分平均足のチャートを作成
         self.chart = TechnicalChart('T')
-        self.trend_checker = SimpleTrendChecker()
+        if bot_config['trend_checker']['type'] == 'Simple':
+            self.trend_checker = SimpleTrendChecker()
+        elif bot_config['trend_checker']['type'] == 'RSI':
+            params = bot_config['trend_checker']['params']
+            self.trend_checker =  RSITrendChecker(params[0], params[1], params[2])
+
+        assert self.trend_checker
 
         # パラメータ初期化
         self._api = gmo.GMO(access_key, secret_key)
