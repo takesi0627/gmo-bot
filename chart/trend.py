@@ -14,11 +14,10 @@ class SimpleTrendChecker(TrendChecker):
     CHECK_LENGTH = 3
 
     def check_trend(self, chart: TechnicalChart) -> ETrendType:
-        candles = chart.avg_candles
-        if len(candles) < self.CHECK_LENGTH:
+        if len(chart.avg_candles) < self.CHECK_LENGTH:
             return ETrendType.NONE
 
-
+        candles = chart.get_candles_by_index(-self.CHECK_LENGTH)
         if self.in_up_trend(candles):
             return ETrendType.UP
 
@@ -28,19 +27,10 @@ class SimpleTrendChecker(TrendChecker):
         return ETrendType.NONE
 
     def in_up_trend(self, candles):
-        for i in range(-3, 0):
-            if not candles[list(candles)[i]].is_up():
-                return False
-
-        return True
+        return all([c.is_up() for c in candles.values()])
 
     def in_down_trend(self, candles):
-        for i in range(-3, 0):
-            if not candles[list(candles)[i]].is_down():
-                return False
-
-        return True
-
+        return all([c.is_down() for c in candles.values()])
 
 class RSITrendChecker(SimpleTrendChecker):
     def __init__(self, period=14, th1=40, th2=60):
