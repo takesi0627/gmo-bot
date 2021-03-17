@@ -14,7 +14,7 @@ class SimpleTrendChecker(TrendChecker):
     CHECK_LENGTH = 3
 
     def check_trend(self, chart: TechnicalChart) -> ETrendType:
-        candles = chart.candles
+        candles = chart.avg_candles
         if len(candles) < self.CHECK_LENGTH:
             return ETrendType.NONE
 

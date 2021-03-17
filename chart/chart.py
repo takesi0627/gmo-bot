@@ -6,7 +6,7 @@ import websocket
 
 class TechnicalChart:
     def __init__(self, candle_period='T', max_length=3600):
-        self.candles = {}
+        self.avg_candles = {}
         self.__period = candle_period
         self._max_length = max_length
 
@@ -14,17 +14,18 @@ class TechnicalChart:
         now = pd.to_datetime(trade_data['timestamp'])
         now_minute = now.round(self.__period)
 
-        if self.candles.get(now_minute):
-            self.candles.get(now_minute).update(trade_data)
+        if self.avg_candles.get(now_minute):
+            self.avg_candles.get(now_minute).update(trade_data)
         else:
-            if len(self.candles) <= 1:  # 始値のずれを修正するため 2分まで普通のローソク足
-                self.candles[now_minute] = Candle(trade_data['price'])
+            if len(self.avg_candles) <= 1:  # 始値のずれを修正するため 2分まで普通のローソク足
+                self.avg_candles[now_minute] = Candle(trade_data['price'])
             else:
-                prev_candle = self.candles[list(self.candles)[-1]]
-                self.candles[now_minute] = AverageCandle(prev_candle)
+                prev_candle = self.avg_candles[list(self.avg_candles)[-1]]
+                self.avg_candles[now_minute] = AverageCandle(prev_candle)
 
-        if len(self.candles) > self._max_length:
-            self.candles.pop(list(self.candles)[0])
+        if len(self.avg_candles) > self._max_length:
+            self.avg_candles.pop(list(self.avg_candles)[0])
+
 
     def print_candles(self, from_time, to_time):
         c_list = self.get_candles(from_time, to_time)
@@ -46,26 +47,25 @@ class TechnicalChart:
     def get_candles(self, from_time, to_time):
         f = pd.to_datetime(from_time).round(self.__period)
         t = pd.to_datetime(to_time).round(self.__period)
-        f_i = list(self.candles).index(f)
-        t_i = list(self.candles).index(t)
+        f_i = list(self.avg_candles).index(f)
+        t_i = list(self.avg_candles).index(t)
         ret = {}
-        for i in itertools.islice(list(self.candles), f_i, t_i + 1):
-            ret[i] = self.candles[i]
+        for i in itertools.islice(list(self.avg_candles), f_i, t_i + 1):
+            ret[i] = self.avg_candles[i]
 
         return ret
 
     def get_candles_by_index(self, from_index, to_index=-1):
-        return self.get_candles(list(self.candles)[from_index], list(self.candles)[to_index])
+        return self.get_candles(list(self.avg_candles)[from_index], list(self.avg_candles)[to_index])
 
     def getRSI(self, period=14):
-        if len(self.candles) < period:
+        if len(self.avg_candles) < period:
             return -1
 
         candles = self.get_candles_by_index(-period)
         if len(candles) < period:
             return -1
 
-        epsilon = 1e-6
         gain_avg = sum([c.close - c.open for c in candles.values() if c.is_up()]) / period
         loss_avg = sum([c.open - c.close for c in candles.values() if c.is_down()]) / period
         rsi = gain_avg / (gain_avg + loss_avg) * 100
@@ -114,7 +114,7 @@ if __name__ == '__main__':
 
     def on_message(ws, message):
         chart.update(json.loads(message))
-        print(list(chart.candles)[-1], chart.candles[list(chart.candles)[-1]])
+        print(list(chart.avg_candles)[-1], chart.avg_candles[list(chart.avg_candles)[-1]])
 
 
     def on_error(ws, e):
