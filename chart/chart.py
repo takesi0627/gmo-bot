@@ -5,12 +5,18 @@ import pandas as pd
 import websocket
 
 class TechnicalChart:
+    RSI_PERIOD = 14
     def __init__(self, candle_period='T', max_length=3600):
         self.avg_candles = {}
+        self.basic_candles = {}
         self.__period = candle_period
         self._max_length = max_length
 
     def update(self, trade_data):
+        self.__update_avg_candles(trade_data)
+        self.__update_basic_candles(trade_data)
+
+    def __update_avg_candles(self, trade_data):
         now = pd.to_datetime(trade_data['timestamp'])
         now_minute = now.round(self.__period)
 
@@ -25,6 +31,19 @@ class TechnicalChart:
 
         if len(self.avg_candles) > self._max_length:
             self.avg_candles.pop(list(self.avg_candles)[0])
+
+    def __update_basic_candles(self, trade_data):
+        now = pd.to_datetime(trade_data['timestamp'])
+        now_minute = now.round(self.__period)
+
+        if self.basic_candles.get(now_minute):
+            self.basic_candles.get(now_minute).update(trade_data)
+        else:
+            self.basic_candles[now_minute] = Candle(trade_data['price'])
+
+        if len(self.basic_candles) > self._max_length:
+            self.basic_candles.pop(list(self.basic_candles)[0])
+
 
 
     def print_candles(self, from_time, to_time):
