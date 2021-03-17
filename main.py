@@ -49,9 +49,9 @@ if __name__ == '__main__':
         print("usage: python main.py <simulation_flag>")
         exit(-1)
 
-    if sys.argv[1] == 1:
+    if sys.argv[1] == '1':
         SIMULATION_FLG = True
-    elif sys.argv[1] == 0:
+    elif sys.argv[1] == '0':
         SIMULATION_FLG = False
 
     if SIMULATION_FLG:
