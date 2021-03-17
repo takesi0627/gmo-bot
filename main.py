@@ -1,3 +1,4 @@
+import os
 import sys
 from datetime import timedelta
 
@@ -45,8 +46,8 @@ def monitoring():
     bot.chart.print_candles_by_index(-20)
 
 if __name__ == '__main__':
-    if len(sys.argv) < 2:
-        print("usage: python main.py <simulation_flag>")
+    if len(sys.argv) < 3:
+        print("usage: python main.py <simulation_flag> <config_path>")
         exit(-1)
 
     if sys.argv[1] == '1':
@@ -54,12 +55,17 @@ if __name__ == '__main__':
     elif sys.argv[1] == '0':
         SIMULATION_FLG = False
 
+    config_path = sys.argv[2]
+    if not os.path.exists(config_path):
+        print(config_path, "not exist")
+        exit(-1)
+
     if SIMULATION_FLG:
         print("Bot Simulation Start.")
-        bot = GMOCoinBotSimulator('configs/gmobot-simulation.json')
+        bot = GMOCoinBotSimulator(config_path)
     else:
         print("****REAL BOT START*****")
-        bot = GMOCoinBot('configs/gmobot-master.json')
+        bot = GMOCoinBot(config_path)
 
     tl.start(block=False)
 
