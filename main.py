@@ -1,3 +1,4 @@
+import sys
 from datetime import timedelta
 
 from  timeloop import Timeloop
@@ -7,7 +8,7 @@ from gmocoin_bot.simulator import GMOCoinBotSimulator
 
 bot: GMOCoinBot
 
-SIMULATION_FLG = False
+SIMULATION_FLG = True
 
 tl = Timeloop()
 
@@ -39,11 +40,25 @@ def check_server_status():
         elif bot.get_state() == EBotState.Paused and bot.get_server_status() == 'OPEN':
             bot.run()
 
+@tl.job(interval=timedelta(minutes=1))
+def monitoring():
+    bot.chart.print_candles_by_index()
 
 if __name__ == '__main__':
+    if len(sys.argv) < 2:
+        print("usage: python main.py <simulation_flag>")
+        exit(-1)
+
+    if sys.argv[1] == 1:
+        SIMULATION_FLG = True
+    elif sys.argv[1] == 0:
+        SIMULATION_FLG = False
+
     if SIMULATION_FLG:
+        print("Bot Simulation Start.")
         bot = GMOCoinBotSimulator('configs/gmobot-simulation.json')
     else:
+        print("****REAL BOT START*****")
         bot = GMOCoinBot('configs/gmobot-master.json')
 
     tl.start(block=False)

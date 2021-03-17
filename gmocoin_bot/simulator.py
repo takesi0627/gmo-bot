@@ -13,6 +13,10 @@ class GMOCoinBotSimulator(GMOCoinBot):
         self.init_jpy = int(self._api.account_margin()['actualProfitLoss'])
         self.curr_jpy = self.init_jpy
 
+    def _ws_init(self):
+        self._ws_ticker = self._ws_subscribe('ticker')
+        self._ws_trades = self._ws_subscribe('trades')
+
     def _init_position_list(self):
         pass
         # if not exists(self.SAVE_PATH):
@@ -64,7 +68,12 @@ class GMOCoinBotSimulator(GMOCoinBot):
         self.report(position)
         self.curr_jpy += position.lossGain + (position.price * position.size) / position.leverage
         self._position_list.remove(position)
+        self._prev_entry_time = None
         self.__save_data()
+
+    def close_positions(self, p_type):
+        for p in [p for p in self._position_list if p.type == p_type]:
+            self.close_position(p)
 
     def get_balance(self):
         position_sum = 0

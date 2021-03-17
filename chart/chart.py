@@ -11,10 +11,14 @@ class TechnicalChart:
         self.basic_candles = {}
         self.__period = candle_period
         self._max_length = max_length
+        self.rsi = -1
+        self.gain_avg = 0
+        self.loss_avg = 0
 
     def update(self, trade_data):
         self.__update_avg_candles(trade_data)
         self.__update_basic_candles(trade_data)
+        self.__update_rsi()
 
     def __update_avg_candles(self, trade_data):
         now = pd.to_datetime(trade_data['timestamp'])
@@ -44,7 +48,27 @@ class TechnicalChart:
         if len(self.basic_candles) > self._max_length:
             self.basic_candles.pop(list(self.basic_candles)[0])
 
+    def __update_rsi(self):
+        if len(self.basic_candles) == self.RSI_PERIOD:
+            self.gain_avg = sum([c.close - c.open for c in self.basic_candles.values() if c.is_up()]) / self.RSI_PERIOD
+            self.loss_avg = sum([c.open - c.close for c in self.basic_candles.values() if c.is_down()]) / self.RSI_PERIOD
+            self.rsi = self.gain_avg / (self.gain_avg + self.loss_avg) * 100
+        elif len(self.basic_candles) > self.RSI_PERIOD:
+            last_candle = self.basic_candles[list(self.basic_candles)[-1]]
+            if last_candle.is_up():
+                self.gain_avg = (self.gain_avg * (self.RSI_PERIOD - 1) + (last_candle.close - last_candle.open)) / self.RSI_PERIOD
+                self.loss_avg = (self.loss_avg * (self.RSI_PERIOD - 1)) / self.RSI_PERIOD
+            else:
+                self.gain_avg = (self.gain_avg * (self.RSI_PERIOD - 1)) / self.RSI_PERIOD
+                self.loss_avg = (self.loss_avg * (self.RSI_PERIOD - 1) + (last_candle.open - last_candle.close)) / self.RSI_PERIOD
 
+            self.rsi = self.gain_avg / (self.gain_avg + self.loss_avg) * 100
+
+    def print_candles_by_index(self, from_idx=0, to_idx=-1):
+        if (to_idx - from_idx) < len(self.avg_candles):
+            from_idx = 0
+            to_idx = -1
+        self.print_candles(list(self.avg_candles)[from_idx], list(self.avg_candles)[to_idx])
 
     def print_candles(self, from_time, to_time):
         c_list = self.get_candles(from_time, to_time)

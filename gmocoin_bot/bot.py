@@ -32,24 +32,19 @@ class Position(gmo.Position):
         self.type = raw_data['side']
         self.curr_price = self.price
         self.profit_rate = 0
-        self.allow_tick = True
 
     def update(self, ticker):
-        if not self.allow_tick:
-            return
 
         if self.type == POSITION_TYPE_BUY:
-            self.curr_price = int(ticker['bid'])
+            self.curr_price = int(ticker['last'])
 
             self.profit_rate = (self.curr_price - self.price) / self.price
             self.lossGain = (self.curr_price - self.price) * self.size
         elif self.type == POSITION_TYPE_SELL:
-            self.curr_price = int(ticker['ask'])
+            self.curr_price = int(ticker['last'])
 
             self.profit_rate = (self.price - self.curr_price) / self.price
             self.lossGain = (self.price - self.curr_price) * self.size
-
-        self.allow_tick = False
 
     def get_keep_time(self):
         now = datetime.now(tz=self.timestamp.tzinfo)
@@ -67,17 +62,6 @@ class Position(gmo.Position):
 
     def entry_report(self):
         print("POSITION ENTRY： type[{}] price[{}] size[{}]".format(self.side, self.price, self.size))
-
-    def close_order(self, close_size: float):
-        self.orderdSize += close_size
-        self.allow_tick = False
-
-    def cancel_close_order(self, size: float):
-        self.orderdSize -= size
-        self.allow_tick = True
-
-    def enabled_close(self, close_size):
-        return self.orderdSize + float(close_size) <= self.size
 
 class BotParams:
     def __init__(self, bot_config):
@@ -116,7 +100,7 @@ class GMOCoinBot:
 
         # 分平均足のチャートを作成
         self.chart = TechnicalChart('T')
-        self.trend_checker = RSITrendChecker()
+        self.trend_checker = SimpleTrendChecker()
 
         # パラメータ初期化
         self._api = gmo.GMO(access_key, secret_key)
@@ -152,7 +136,7 @@ class GMOCoinBot:
         # WebSocket購読
         self.__token = self._api.get_ws_access_token()
         print("=============Initialize Websocket ...===============")
-        self.__ws_init()
+        self._ws_init()
         print("============== Websocket initialized ===============")
 
         self.__set_state(EBotState.Running)
@@ -197,24 +181,24 @@ class GMOCoinBot:
 
     def ws_check_connection(self):
         if not self._ws_ticker.keep_running:
-            self._ws_ticker = self.__ws_subscribe('ticker')
+            self._ws_ticker = self._ws_subscribe('ticker')
         if not self._ws_trades.keep_running:
-            self._ws_trades = self.__ws_subscribe('trades')
+            self._ws_trades = self._ws_subscribe('trades')
         if not self._ws_order_events.keep_running:
-            self._ws_execution_events = self.__ws_subscribe('executionEvents')
+            self._ws_execution_events = self._ws_subscribe('executionEvents')
         if not self._ws_position_events.keep_running:
-            self._ws_order_events = self.__ws_subscribe('orderEvents')
+            self._ws_order_events = self._ws_subscribe('orderEvents')
         if not self._ws_execution_events.keep_running:
-            self._ws_position_events = self.__ws_subscribe('positionEvents')
+            self._ws_position_events = self._ws_subscribe('positionEvents')
 
-    def __ws_init(self):
-        self._ws_ticker = self.__ws_subscribe('ticker')
-        self._ws_trades = self.__ws_subscribe('trades')
-        self._ws_execution_events = self.__ws_subscribe('executionEvents')
-        self._ws_order_events = self.__ws_subscribe('orderEvents')
-        self._ws_position_events = self.__ws_subscribe('positionEvents')
+    def _ws_init(self):
+        self._ws_ticker = self._ws_subscribe('ticker')
+        self._ws_trades = self._ws_subscribe('trades')
+        self._ws_execution_events = self._ws_subscribe('executionEvents')
+        self._ws_order_events = self._ws_subscribe('orderEvents')
+        self._ws_position_events = self._ws_subscribe('positionEvents')
 
-    def __ws_subscribe(self, channel) -> websocket.WebSocketApp or None:
+    def _ws_subscribe(self, channel) -> websocket.WebSocketApp or None:
         ws = None
         if channel == 'ticker':
             ws = self._api.subscribe_public_ws('ticker', self._symbol, lambda ws, message: self.update_ticker(json.loads(message)))
@@ -233,23 +217,23 @@ class GMOCoinBot:
         return ws
 
     def __ws_close(self):
-        if self._ws_ticker.keep_running:
+        if self._ws_ticker and self._ws_ticker.keep_running:
             self._ws_ticker.send(json.dumps({"command": "unsubscribe", "channel": "ticker", "symbol": self._symbol}))
             self._ws_ticker.close()
             sleep(WEBSOCKET_CALL_WAIT_TIME)  # 一秒間1回しか購読できないため
-        if self._ws_trades.keep_running:
+        if self._ws_trades and self._ws_trades.keep_running:
             self._ws_trades.send(json.dumps({"command": "unsubscribe", "channel": "trades", "symbol": self._symbol}))
             self._ws_trades.close()
             sleep(WEBSOCKET_CALL_WAIT_TIME)  # 一秒間1回しか購読できないため
-        if self._ws_execution_events.keep_running:
+        if  self._ws_execution_events and self._ws_execution_events.keep_running:
             self._ws_execution_events.send(json.dumps({"command": "unsubscribe", "channel": "executionEvents"}))
             self._ws_execution_events.close()
             sleep(WEBSOCKET_CALL_WAIT_TIME)  # 一秒間1回しか購読できないため
-        if self._ws_order_events.keep_running:
+        if self._ws_order_events and self._ws_order_events.keep_running:
             self._ws_order_events.send(json.dumps({"command": "unsubscribe", "channel": "orderEvents"}))
             self._ws_order_events.close()
             sleep(WEBSOCKET_CALL_WAIT_TIME)  # 一秒間1回しか購読できないため
-        if self._ws_position_events:
+        if self._ws_position_events and self._ws_position_events.keep_running:
             self._ws_position_events.send(json.dumps({"command": "unsubscribe", "channel": "positionEvents"}))
             self._ws_position_events.close()
             sleep(WEBSOCKET_CALL_WAIT_TIME)
@@ -268,10 +252,10 @@ class GMOCoinBot:
             lossGain = int(execution_data['lossGain'])
             if lossGain > 0:
                 self.win_num += 1
+                self._prev_entry_time = None # 利益出た時だけ追加注文する
             self.trade_num += 1
             self.profit_sum += lossGain
             close_pos = self.get_position(execution_data['positionId'])
-            self._prev_entry_time = None
             if close_pos:
                 self._position_list.remove(close_pos)
                 close_pos.lossGain = lossGain
@@ -308,18 +292,14 @@ class GMOCoinBot:
             p.update(ticker)
             if self.should_exit(p):
                 self.close_position(p)
-            else:
-                p.allow_tick = True
 
         trend = self.trend_checker.check_trend(self.chart)
         if trend == ETrendType.UP:
             if self.can_entry():
-                print("RSI: ", self.chart.getRSI())
                 self.entry_position(POSITION_TYPE_BUY, ticker['ask'], self.params.position_unit)
             self.close_positions(POSITION_TYPE_SELL)
         elif trend == ETrendType.DOWN:
             if self.can_entry():
-                print("RSI: ", self.chart.getRSI())
                 self.entry_position(POSITION_TYPE_SELL, ticker['bid'], self.params.position_unit)
             self.close_positions(POSITION_TYPE_BUY)
 
@@ -333,7 +313,6 @@ class GMOCoinBot:
         return keep_time_sec > self.params.max_keep_time
 
     def should_exit(self, position: Position):
-        # 注文後すぐ決済することがあるから一旦これで対応
         if position.profit_rate > self.params.profit_rate:
             return True
 
@@ -356,9 +335,6 @@ class GMOCoinBot:
         self._api.order(self._symbol, side, 'LIMIT', size, int(price))
 
     def close_position(self, position:Position):
-        if not position.enabled_close(position.size):
-            return
-
         if position.type == POSITION_TYPE_BUY:
             self._api.close_order(self._symbol, POSITION_TYPE_SELL, 'LIMIT', position.id, position.size, position.curr_price, time_in_force='FOK')
         elif position.type == POSITION_TYPE_SELL:
