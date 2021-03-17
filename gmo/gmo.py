@@ -293,7 +293,13 @@ class GMO:
         return self._send_public('/v1/trades?symbol={}&page={}&count={}'.format(symbol, page, count))
 
     def status(self):
-        return self._send_public('/v1/status')
+        response = requests.get(self._public + '/v1/status').json()
+        if response['status'] == 0:
+            return response['data']
+        elif response['status'] == 5 and response['messages'][0]['message_code'] == 'ERR-5201':
+            return {'status': 'MAINTENANCE'}
+        else:
+            raise Exception(response['messages'])
 
 
     # endregion public api
