@@ -43,9 +43,11 @@ class SimpleTrendChecker(TrendChecker):
 
 
 class RSITrendChecker(SimpleTrendChecker):
-    def __init__(self, period=14):
+    def __init__(self, period=14, th1=40, th2=60):
         super().__init__()
         self._period = period
+        self._th1 = th1
+        self._th2 = th2
 
     def check_trend(self, chart: TechnicalChart) -> ETrendType:
         rsi = chart.getRSI(self._period)
@@ -56,14 +58,14 @@ class RSITrendChecker(SimpleTrendChecker):
         else:
             simple_trend = super().check_trend(chart)
             if simple_trend == ETrendType.UP:
-                if rsi > 50:
+                if rsi < self._th1:
+                    return ETrendType.NONE
+                else:
                     return ETrendType.UP
-                else:
-                    return ETrendType.NONE
             elif simple_trend == ETrendType.DOWN:
-                if rsi < 50:
-                    return ETrendType.DOWN
-                else:
+                if rsi > self._th2:
                     return ETrendType.NONE
+                else:
+                    return ETrendType.DOWN
 
         return ETrendType.NONE
