@@ -1,4 +1,5 @@
-from datetime import datetime
+import os
+from datetime import datetime, timedelta
 from enum import Enum
 from time import sleep
 from typing import List
@@ -48,7 +49,7 @@ class Position(gmo.Position):
             self.profit_rate = (self.price - self.curr_price) / self.price
             self.lossGain = (self.price - self.curr_price) * self.size
 
-    def get_keep_time(self):
+    def get_keep_time(self) -> timedelta:
         now = datetime.now(tz=self.timestamp.tzinfo)
         entry_time = self.timestamp
         return now - entry_time
@@ -56,11 +57,11 @@ class Position(gmo.Position):
     def execute_report(self):
         keep_time = self.get_keep_time()
         if self.type == POSITION_TYPE_BUY:
-            return str.format("[BUY: {:.0f} -> SELL: {:.0f}][KEEP TIME: {}] 損益：{:+.0f}",
-                              self.price, self.curr_price, keep_time, self.lossGain)
+            return str.format("[BUY: {:.0f} -> SELL: {:.0f}][KEEP TIME: {}:{}] 損益：{:+.0f}",
+                              self.price, self.curr_price, int(keep_time.seconds / 60), keep_time.seconds % 60, self.lossGain)
         elif self.type == POSITION_TYPE_SELL:
-            return str.format("[SELL: {:.0f} -> BUY: {:.0f}][KEEP TIME: {}] 損益：{:+.0f}",
-                              self.price, self.curr_price, keep_time, self.lossGain)
+            return str.format("[SELL: {:.0f} -> BUY: {:.0f}][KEEP TIME: {}:{}] 損益：{:+.0f}",
+                              self.price, self.curr_price, int(keep_time.seconds / 60), keep_time.seconds % 60, self.lossGain)
 
     def entry_report(self):
         print("POSITION ENTRY： type[{}] price[{}] size[{}]".format(self.side, self.price, self.size))
@@ -94,9 +95,10 @@ class GMOCoinBot:
         # メンバー初期化
         self._api = api
         self.chart = in_chart
-        if bot_config['trend_checker']['type'] == 'Simple':
+        checker_type = bot_config['trend_checker']['type']
+        if checker_type == 'Simple':
             self.trend_checker = SimpleTrendChecker()
-        elif bot_config['trend_checker']['type'] == 'RSI':
+        elif checker_type == 'RSI':
             params = bot_config['trend_checker']['params']
             self.trend_checker =  RSITrendChecker(params[0], params[1], params[2])
 
@@ -115,7 +117,9 @@ class GMOCoinBot:
         self.trade_num = 0
         self.init_jpy = 0
         self.profit_sum = 0 # 決済済みの利益総和
+        log_path = "trade.{}{}{}.log".format(datetime.now().strftime("%Y%m%d%H%M%S"), checker_type, self.params.profit_rate)
 
+        self.__logger = Logger(log_path)
         self._setup_timer()
 
     def _setup_timer(self):
@@ -225,9 +229,6 @@ class GMOCoinBot:
                 self.entry_position(POSITION_TYPE_SELL, ticker['bid'], self.params.position_unit)
             self.close_positions(POSITION_TYPE_BUY)
 
-    def update_trades(self, trade):
-        self.chart.update(trade)
-
     def is_position_timeout(self, position: Position):
         keep_time_sec = position.get_keep_time().seconds
         if keep_time_sec > self.params.max_keep_time:
@@ -324,6 +325,21 @@ class GMOCoinBot:
         return self.profit_sum / self.init_jpy
 
     def report(self, p: Position):
-        print("[{}]決済しました。{} 勝率[{:.2%}] 時価評価総額: {:.0f} 利回り[{:+.0f} {:.2%}]".format(
-            datetime.now(), p.execute_report(), self.win_num / self.trade_num, self.get_balance(), self.profit_sum, self.get_profit_rate()
+        self.__logger.log("[{}]{} 勝率[{:.2%}] 時価評価総額: {:.0f} 利回り[{:+.0f} {:.2%}]".format(
+            datetime.now().strftime("%m-%d %H:%M:%S"), p.execute_report(), self.win_num / self.trade_num, self.get_balance(), self.profit_sum, self.get_profit_rate()
         ))
+
+class Logger:
+    LOG_DIR = 'logs'
+    def __init__(self, filename):
+        if not os.path.exists(self.LOG_DIR):
+            os.makedirs(self.LOG_DIR)
+
+        self.__filepath = "{}/{}".format(self.LOG_DIR, filename)
+        # Create File
+        f = open(self.__filepath, "x")
+        f.close()
+
+    def log(self, output_str):
+        with open(self.__filepath, 'a') as f:
+            print(output_str, file=f)

@@ -63,6 +63,8 @@ class TechnicalChart:
         c_list = self.get_candles(from_time, to_time)
         return len([c for c in c_list.values() if c.is_up()]) - len([c for c in c_list.values() if c.is_down()])
 
+    def get_last_candle(self):
+        return self.avg_candles[list(self.avg_candles)[-1]]
 
     def get_candles(self, from_time, to_time):
         f = pd.to_datetime(from_time).round(self.__period)
