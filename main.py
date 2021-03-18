@@ -81,7 +81,7 @@ if __name__ == '__main__':
             wait_time = schedule.idle_seconds()
             if wait_time is None:
                 raise Exception("There should be some tasks waiting to execute")
-            else:
+            elif wait_time > 0:
                 sleep(wait_time)
             schedule.run_pending()
     except KeyboardInterrupt:
