@@ -13,6 +13,9 @@ class GMOCoinBotSimulator(GMOCoinBot):
         self.init_jpy = int(self._api.account_margin()['actualProfitLoss'])
         self.curr_jpy = self.init_jpy
 
+    def _setup_timer(self):
+        pass
+
     def _init_position_list(self):
         pass
 

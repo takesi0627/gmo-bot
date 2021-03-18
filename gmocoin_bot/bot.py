@@ -116,7 +116,11 @@ class GMOCoinBot:
         self.init_jpy = 0
         self.profit_sum = 0 # 決済済みの利益総和
 
+        self._setup_timer()
+
+    def _setup_timer(self):
         schedule.every(5).minutes.do(self.update_positions)
+        schedule.every(5).minutes.do(self.cancel_order_check)
 
     def run(self):
         self.init_jpy = self.get_balance()

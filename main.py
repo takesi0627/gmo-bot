@@ -17,18 +17,6 @@ bots: list[GMOCoinBot]
 tl = Timeloop()
 
 @tl.job(interval=timedelta(minutes=1))
-def cancel_order_check():
-    for bot in bots:
-        if not SIMULATION_FLG and bot.get_state() == EBotState.Running:
-            bot.cancel_order_check()
-
-@tl.job(interval=timedelta(minutes=5))
-def update_positions():
-    for bot in bots:
-        if not SIMULATION_FLG and bot.get_state() == EBotState.Running:
-            bot.update_positions()
-
-@tl.job(interval=timedelta(minutes=1))
 def check_server_status():
     if not SIMULATION_FLG:
         for bot in bots:
