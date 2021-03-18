@@ -72,15 +72,7 @@ class TechnicalChart:
 
     def print_candles(self, from_time, to_time):
         c_list = self.get_candles(from_time, to_time)
-        result_str = ""
-        for c in c_list.values():
-            if c.is_up():
-                char = '↑'
-            else:
-                char = '↓'
-            result_str += char
-
-        print(result_str)
+        print("".join([str(c) for c in c_list.values()]))
 
     def evaluate_candles(self, from_time, to_time):
         c_list = self.get_candles(from_time, to_time)
@@ -129,7 +121,13 @@ class Candle:
         self.close = price
 
     def __str__(self):
-        return "O[{}] H[{}] L[{}] C[{}]".format(self.open, self.high, self.low, self.close)
+        # return "O[{}] H[{}] L[{}] C[{}]".format(self.open, self.high, self.low, self.close)
+        if self.is_up():
+            return "↑"
+        elif self.is_down():
+            return "↓"
+        else:
+            return "-"
 
     def is_up(self):
         return self.close > self.open
