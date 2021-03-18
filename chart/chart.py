@@ -11,9 +11,7 @@ class TechnicalChart:
         self.basic_candles = {}
         self.__period = candle_period
         self._max_length = max_length
-        self.rsi = -1
-        self.gain_avg = 0
-        self.loss_avg = 0
+        self.rsi = RSI(self.RSI_PERIOD)
 
     def update(self, trade_data):
         self.__update_avg_candles(trade_data)
@@ -49,20 +47,7 @@ class TechnicalChart:
             self.basic_candles.pop(list(self.basic_candles)[0])
 
     def __update_rsi(self):
-        if len(self.basic_candles) == self.RSI_PERIOD:
-            self.gain_avg = sum([c.close - c.open for c in self.basic_candles.values() if c.is_up()]) / self.RSI_PERIOD
-            self.loss_avg = sum([c.open - c.close for c in self.basic_candles.values() if c.is_down()]) / self.RSI_PERIOD
-            self.rsi = self.gain_avg / (self.gain_avg + self.loss_avg) * 100
-        elif len(self.basic_candles) > self.RSI_PERIOD:
-            last_candle = self.basic_candles[list(self.basic_candles)[-1]]
-            if last_candle.is_up():
-                self.gain_avg = (self.gain_avg * (self.RSI_PERIOD - 1) + (last_candle.close - last_candle.open)) / self.RSI_PERIOD
-                self.loss_avg = (self.loss_avg * (self.RSI_PERIOD - 1)) / self.RSI_PERIOD
-            else:
-                self.gain_avg = (self.gain_avg * (self.RSI_PERIOD - 1)) / self.RSI_PERIOD
-                self.loss_avg = (self.loss_avg * (self.RSI_PERIOD - 1) + (last_candle.open - last_candle.close)) / self.RSI_PERIOD
-
-            self.rsi = self.gain_avg / (self.gain_avg + self.loss_avg) * 100
+        self.rsi.update(self.basic_candles)
 
     def print_candles_by_index(self, from_idx=0, to_idx=-1):
         if (to_idx - from_idx) >= len(self.avg_candles):
@@ -94,17 +79,62 @@ class TechnicalChart:
         return self.get_candles(list(self.avg_candles)[from_index], list(self.avg_candles)[to_index])
 
     def getRSI(self, period=14):
-        if len(self.avg_candles) < period:
-            return -1
+        return self.rsi
 
-        candles = self.get_candles_by_index(-period)
-        if len(candles) < period:
-            return -1
+class RSI:
+    def __init__(self, period):
+        self.gain_avg = 0
+        self.loss_avg = 0
+        self.__rsi_step = 0
+        self.value = -1
+        self.period = period
+        self._last_gain = 0
+        self._last_loss = 0
 
-        gain_avg = sum([c.close - c.open for c in candles.values() if c.is_up()]) / period
-        loss_avg = sum([c.open - c.close for c in candles.values() if c.is_down()]) / period
-        rsi = gain_avg / (gain_avg + loss_avg) * 100
-        return rsi
+    def update(self, candles):
+        if len(candles) == self.period:
+            self.__step_one(candles)
+            self.__rsi_step = self.period
+        elif len(candles) > self.period:
+            last_candle = candles[list(candles)[-1]]
+            if len(candles) > self.__rsi_step + 1:
+                self.__new_step(last_candle)
+                self.__rsi_step += 1
+            else:
+                self.__update_step(last_candle)
+
+    def __update_step(self, last_candle):
+        if last_candle.is_up():
+            gain_avg = (self.gain_avg * (self.period - 1) + (
+                    last_candle.close - last_candle.open)) / self.period
+            loss_avg = (self.loss_avg * (self.period - 1)) / self.period
+        else:
+            gain_avg = (self.gain_avg * (self.period - 1)) / self.period
+            loss_avg = (self.loss_avg * (self.period - 1) + (
+                    last_candle.open - last_candle.close)) / self.period
+
+        self.value = gain_avg / (gain_avg + loss_avg) * 100
+
+    def __new_step(self, last_candle):
+        if last_candle.is_up():
+            self.gain_avg = (self.gain_avg * (self.period - 1) + (
+                    last_candle.close - last_candle.open)) / self.period
+            self.loss_avg = (self.loss_avg * (self.period - 1)) / self.period
+        else:
+            self.gain_avg = (self.gain_avg * (self.period - 1)) / self.period
+            self.loss_avg = (self.loss_avg * (self.period - 1) + (
+                    last_candle.open - last_candle.close)) / self.period
+
+        self.value = self.gain_avg / (self.gain_avg + self.loss_avg) * 100
+
+    def __step_one(self, candles):
+        self.gain_avg = sum([c.close - c.open for c in candles.values() if c.is_up()]) / self.period
+        self.loss_avg = sum(
+            [c.open - c.close for c in candles.values() if c.is_down()]) / self.period
+        self.value = self.gain_avg / (self.gain_avg + self.loss_avg) * 100
+
+    def __str__(self):
+        return str(self.value)
 
 class Candle:
     def __init__(self, open_price):
