@@ -6,7 +6,7 @@ import websocket
 
 class TechnicalChart:
     RSI_PERIOD = 14
-    def __init__(self, candle_period='T', max_length=3600):
+    def __init__(self, candle_period='T', max_length=60):
         self.avg_candles = {}
         self.basic_candles = {}
         self.__period = candle_period
