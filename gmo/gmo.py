@@ -2,6 +2,7 @@ import _thread
 import hashlib
 import hmac
 import json
+import sys
 from datetime import datetime, timedelta
 import time
 from json import JSONEncoder
@@ -324,7 +325,9 @@ class GMO:
                                         "command": "subscribe",
                                         "channel": channel})
                                     ),
-                                    on_message=on_message
+                                    on_message=on_message,
+                                    on_error=lambda wws, e: print(e, file=sys.stderr),
+                                    on_close=lambda wws: print("WEBSOCKET [{}] CLOSED".format(wws.url), file=sys.stderr)
                                     )
         _thread.start_new_thread(lambda: ws.run_forever(), ())
         return ws
