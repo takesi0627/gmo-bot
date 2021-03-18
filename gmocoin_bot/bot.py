@@ -3,6 +3,8 @@ from enum import Enum
 from time import sleep
 from typing import List
 
+import schedule
+
 from chart import ETrendType
 from chart.trend import SimpleTrendChecker, RSITrendChecker
 from gmo import gmo
@@ -82,24 +84,16 @@ class EBotState(Enum):
 
 class GMOCoinBot:
     _position_list: List[Position]
-    _ws_ticker: websocket.WebSocketApp
-    _ws_trades: websocket.WebSocketApp
-    _ws_execution_events: websocket.WebSocketApp
-    _ws_order_events: websocket.WebSocketApp
-    _ws_position_events: websocket.WebSocketApp
     _prev_entry_time: datetime = None
     _entry_order_list: List[int]
     _state = EBotState
 
-    def __init__(self, config_path):
+    def __init__(self, bot_config, api: gmo.GMO, in_chart: TechnicalChart):
         self.__set_state(EBotState.Initializing)
-        config = json.load(open(config_path, 'r'))
-        access_key = config['access_key']
-        secret_key = config['secret_key']
-        bot_config = config['bot_configs']
 
-        # 分平均足のチャートを作成
-        self.chart = TechnicalChart('T')
+        # メンバー初期化
+        self._api = api
+        self.chart = in_chart
         if bot_config['trend_checker']['type'] == 'Simple':
             self.trend_checker = SimpleTrendChecker()
         elif bot_config['trend_checker']['type'] == 'RSI':
@@ -109,14 +103,12 @@ class GMOCoinBot:
         assert self.trend_checker
 
         # パラメータ初期化
-        self._api = gmo.GMO(access_key, secret_key)
         self._symbol = bot_config['symbol']
         self.params = BotParams(bot_config)
 
         self._entry_order_list = []
         self._position_list = []
         self._prev_entry_time = None
-        self.__token = ''
 
         # 分析用
         self.win_num = 0
@@ -124,13 +116,7 @@ class GMOCoinBot:
         self.init_jpy = 0
         self.profit_sum = 0 # 決済済みの利益総和
 
-        self.__set_state(EBotState.Initialized)
-
-        # サーバ状態をチェックしてから起動
-        if self.get_server_status() == 'OPEN':
-            self.run()
-        else:
-            self.__set_state(EBotState.Paused)
+        schedule.every(5).minutes.do(self.update_positions)
 
     def run(self):
         self.init_jpy = self.get_balance()
@@ -138,12 +124,6 @@ class GMOCoinBot:
         # ポジション、注文の初期状態を取得
         self.__init_order_list()
         self._init_position_list()
-
-        # WebSocket購読
-        self.__token = self._api.get_ws_access_token()
-        print("=============Initialize Websocket ...===============")
-        self._ws_init()
-        print("============== Websocket initialized ===============")
 
         self.__set_state(EBotState.Running)
 
@@ -173,80 +153,11 @@ class GMOCoinBot:
                 self._api.cancel_orders(o_close)
                 sleep(1) # キャンセルまで時間かかるかもしれない、一応
 
-    def __del__(self):
-        if self.get_server_status() == 'OPEN':
-            self.__ws_close()
-            self._api.delete_ws_access_token(self.__token)
-
     def get_server_status(self):
         return self._api.status()['status']
 
     def pause(self):
         self.__set_state(EBotState.Paused)
-        self.__ws_close()
-
-    def ws_check_connection(self):
-        if not self._ws_ticker.keep_running:
-            self._ws_ticker = self._ws_subscribe('ticker')
-        if not self._ws_trades.keep_running:
-            self._ws_trades = self._ws_subscribe('trades')
-        if not self._ws_order_events.keep_running:
-            self._ws_execution_events = self._ws_subscribe('executionEvents')
-        if not self._ws_position_events.keep_running:
-            self._ws_order_events = self._ws_subscribe('orderEvents')
-        if not self._ws_execution_events.keep_running:
-            self._ws_position_events = self._ws_subscribe('positionEvents')
-
-    def _ws_init(self):
-        self._ws_ticker = self._ws_subscribe('ticker')
-        self._ws_trades = self._ws_subscribe('trades')
-        self._ws_execution_events = self._ws_subscribe('executionEvents')
-        self._ws_order_events = self._ws_subscribe('orderEvents')
-        self._ws_position_events = self._ws_subscribe('positionEvents')
-
-    def _ws_subscribe(self, channel) -> websocket.WebSocketApp or None:
-        ws = None
-        if channel == 'ticker':
-            ws = self._api.subscribe_public_ws('ticker', self._symbol, lambda ws, message: self.update_ticker(json.loads(message)))
-        elif channel == 'trades':
-            ws = self._api.subscribe_public_ws('trades', self._symbol, lambda ws, message: self.update_trades(json.loads(message)))
-        elif channel == 'executionEvents':
-            ws = self._api.subscribe_private_ws(self.__token, 'executionEvents', lambda ws, message: self.on_execution_events(json.loads(message)))
-        elif channel == 'orderEvents':
-            ws = self._api.subscribe_private_ws(self.__token, 'orderEvents', lambda ws, message: self.on_order_events(json.loads(message)))
-        elif channel == 'positionEvents':
-            ws = self._api.subscribe_private_ws(self.__token, 'positionEvents', lambda ws, message: self.on_position_events(json.loads(message)))
-        else:
-            return None
-
-        sleep(WEBSOCKET_CALL_WAIT_TIME)  # 一秒間1回しか購読できないため
-        return ws
-
-    def __ws_close(self):
-        if self._ws_ticker and self._ws_ticker.keep_running:
-            self._ws_ticker.send(json.dumps({"command": "unsubscribe", "channel": "ticker", "symbol": self._symbol}))
-            self._ws_ticker.close()
-            sleep(WEBSOCKET_CALL_WAIT_TIME)  # 一秒間1回しか購読できないため
-        if self._ws_trades and self._ws_trades.keep_running:
-            self._ws_trades.send(json.dumps({"command": "unsubscribe", "channel": "trades", "symbol": self._symbol}))
-            self._ws_trades.close()
-            sleep(WEBSOCKET_CALL_WAIT_TIME)  # 一秒間1回しか購読できないため
-        if  self._ws_execution_events and self._ws_execution_events.keep_running:
-            self._ws_execution_events.send(json.dumps({"command": "unsubscribe", "channel": "executionEvents"}))
-            self._ws_execution_events.close()
-            sleep(WEBSOCKET_CALL_WAIT_TIME)  # 一秒間1回しか購読できないため
-        if self._ws_order_events and self._ws_order_events.keep_running:
-            self._ws_order_events.send(json.dumps({"command": "unsubscribe", "channel": "orderEvents"}))
-            self._ws_order_events.close()
-            sleep(WEBSOCKET_CALL_WAIT_TIME)  # 一秒間1回しか購読できないため
-        if self._ws_position_events and self._ws_position_events.keep_running:
-            self._ws_position_events.send(json.dumps({"command": "unsubscribe", "channel": "positionEvents"}))
-            self._ws_position_events.close()
-            sleep(WEBSOCKET_CALL_WAIT_TIME)
-
-    def extend_token(self):
-        self._api.extend_ws_access_token(self.__token)
-        print("EXTEND TOKEN")
 
     def on_execution_events(self, execution_data):
         settle_type = execution_data['settleType']

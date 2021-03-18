@@ -7,25 +7,14 @@ from gmocoin_bot.bot import *
 class GMOCoinBotSimulator(GMOCoinBot):
     LEVERAGE_RATE = 4
     SAVE_PATH = 'simulator_save.json'
-    def __init__(self, config_path):
+    def __init__(self, config_path, api, chart):
         self.curr_jpy = 0
-        super().__init__(config_path)
+        super().__init__(config_path, api, chart)
         self.init_jpy = int(self._api.account_margin()['actualProfitLoss'])
         self.curr_jpy = self.init_jpy
 
-    def _ws_init(self):
-        self._ws_ticker = self._ws_subscribe('ticker')
-        self._ws_trades = self._ws_subscribe('trades')
-
     def _init_position_list(self):
         pass
-        # if not exists(self.SAVE_PATH):
-        #     return
-        #
-        # with open(self.SAVE_PATH, 'r') as save_data:
-        #     save_json = json.load(save_data)
-        #     self._position_list = save_json['positions']
-        #     self.profit_sum = save_json['lossGain']
 
     def __save_data(self):
         data = {

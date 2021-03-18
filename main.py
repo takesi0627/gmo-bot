@@ -1,58 +1,55 @@
+import json
 import os
 import sys
 from datetime import timedelta
+from time import sleep
 
+import schedule
 from  timeloop import Timeloop
 
+from chart import TechnicalChart
+from gmo.gmo import GMO
 from gmocoin_bot.bot import GMOCoinBot, EBotState
 from gmocoin_bot.simulator import GMOCoinBotSimulator
+from gmocoin_bot.ws import GMOWebsocketManager
 
-bot: GMOCoinBot
-
-SIMULATION_FLG = True
-
+bots: list[GMOCoinBot]
 tl = Timeloop()
-
-@tl.job(interval=timedelta(minutes=50))
-def extend_token():
-    if not SIMULATION_FLG and bot.get_state() == EBotState.Running:
-        bot.extend_token()
 
 @tl.job(interval=timedelta(minutes=1))
 def cancel_order_check():
-    if not SIMULATION_FLG and bot.get_state() == EBotState.Running:
-        bot.cancel_order_check()
+    for bot in bots:
+        if not SIMULATION_FLG and bot.get_state() == EBotState.Running:
+            bot.cancel_order_check()
 
 @tl.job(interval=timedelta(minutes=5))
 def update_positions():
-    if not SIMULATION_FLG and bot.get_state() == EBotState.Running:
-        bot.update_positions()
-
-@tl.job(interval=timedelta(minutes=1))
-def ws_connection_check():
-    if not SIMULATION_FLG and bot.get_state() == EBotState.Running:
-        bot.ws_check_connection()
+    for bot in bots:
+        if not SIMULATION_FLG and bot.get_state() == EBotState.Running:
+            bot.update_positions()
 
 @tl.job(interval=timedelta(minutes=1))
 def check_server_status():
     if not SIMULATION_FLG:
-        if bot.get_state() == EBotState.Running and bot.get_server_status() != 'OPEN':
-            bot.pause()
-        elif bot.get_state() == EBotState.Paused and bot.get_server_status() == 'OPEN':
-            bot.run()
+        for bot in bots:
+            if bot.get_state() == EBotState.Running and bot.get_server_status() != 'OPEN':
+                bot.pause()
+            elif bot.get_state() == EBotState.Paused and bot.get_server_status() == 'OPEN':
+                bot.run()
 
 @tl.job(interval=timedelta(minutes=1))
 def monitoring():
-    bot.chart.print_candles_by_index(-20)
+    chart.print_candles_by_index(-20)
+    print("RSI:", chart.rsi)
 
 if __name__ == '__main__':
     if len(sys.argv) < 3:
         print("usage: python main.py <simulation_flag> <config_path>")
         exit(-1)
 
-    if sys.argv[1] == '1':
-        SIMULATION_FLG = True
-    elif sys.argv[1] == '0':
+    # シミュレータをデフォルトに
+    SIMULATION_FLG = True
+    if sys.argv[1] == '0':
         SIMULATION_FLG = False
 
     config_path = sys.argv[2]
@@ -60,18 +57,35 @@ if __name__ == '__main__':
         print(config_path, "not exist")
         exit(-1)
 
+    config = json.load(open(config_path, 'r'))
+    access_key = config['access_key']
+    secret_key = config['secret_key']
+    api = GMO(access_key, secret_key)
+    chart = TechnicalChart()
+    bot_configs = config['bot_configs']
+
+    bots = []
     if SIMULATION_FLG:
         print("Bot Simulation Start.")
-        bot = GMOCoinBotSimulator(config_path)
+        bots = [GMOCoinBotSimulator(bc, api, chart) for bc in bot_configs]
     else:
         print("****REAL BOT START*****")
-        bot = GMOCoinBot(config_path)
+        bots = [GMOCoinBot(bc, api, chart) for bc in bot_configs]
+
+    ws_manager = GMOWebsocketManager(bots, chart, api, sim_flg=SIMULATION_FLG)
 
     tl.start(block=False)
 
     try:
         while True:
-            pass
+            wait_time = schedule.idle_seconds()
+            if wait_time is None:
+                raise Exception("There should be some tasks waiting to execute")
+            else:
+                sleep(wait_time)
+            schedule.run_pending()
     except KeyboardInterrupt:
-        del bot
+        schedule.clear()
+        del ws_manager
+        del bots
 
