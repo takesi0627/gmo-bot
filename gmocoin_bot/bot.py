@@ -238,12 +238,9 @@ class GMOCoinBot:
         if position.profit_rate > self.params.profit_rate:
             return True
 
-        # if self.is_position_timeout(position):
-        #     # self.chart.print_candles(position.timestamp, datetime.now(tz=position.timestamp.tzinfo))
-        #     return True
-        #
-        # if position.get_keep_time().seconds > self.params.gate_time:
-        #     return position.profit_rate > self.params.second_profit_rate
+        if (position.type == POSITION_TYPE_BUY and self.chart.get_last_candle().is_down()) or \
+            (position.type == POSITION_TYPE_SELL and self.chart.get_last_candle().is_up()):
+            return position.profit_rate > 0
 
         return False
 
