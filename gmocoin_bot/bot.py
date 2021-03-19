@@ -26,8 +26,6 @@ POSITION_TYPE_BUY = 'BUY'
 POSITION_TYPE_SELL = 'SELL'
 LEVERAGE_RATE = 4
 
-tl = Timeloop()
-
 class Position(gmo.Position):
     def __init__(self, raw_data):
         super().__init__(raw_data)
