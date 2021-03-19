@@ -153,6 +153,7 @@ class GMOCoinBot:
         self._init_position_list()
 
     def __init_order_list(self):
+        self._entry_order_list.clear()
         orders = self._api.activeOrders(self._symbol)
         if orders:
             self._entry_order_list = [int(o['orderId']) for o in orders if o['settleType'] == 'OPEN']
