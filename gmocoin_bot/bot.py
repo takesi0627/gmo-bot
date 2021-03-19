@@ -292,6 +292,7 @@ class GMOCoinBot:
             for o in orders['list']:
                 # 有効以外の場合はスルー
                 if o['status'] != 'ORDERED':
+                    self._entry_order_list.remove(int(o['orderId']))
                     continue
 
                 order_time = pd.to_datetime(o['timestamp'])
