@@ -117,7 +117,7 @@ class GMOCoinBot:
         self.trade_num = 0
         self.init_jpy = 0
         self.profit_sum = 0 # 決済済みの利益総和
-        log_path = "trade.{}{}{}.log".format(datetime.now().strftime("%Y%m%d%H%M%S"), checker_type, self.params.profit_rate)
+        log_path = "trade.{}.{}.log".format(bot_config['name'], datetime.now().strftime("%Y%m%d%H%M%S"))
 
         self.__logger = Logger(log_path)
         self._setup_timer()
