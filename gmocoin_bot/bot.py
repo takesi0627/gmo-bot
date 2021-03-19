@@ -143,16 +143,6 @@ class GMOCoinBot:
             for p in positions['list']:
                 self._position_list.append(Position(p))
 
-    def get_state(self) -> EBotState:
-        return self._state
-
-    def __set_state(self, state: EBotState):
-        print("Set Bot State to:", state)
-        self._state = state
-
-    def update_positions(self):
-        self._init_position_list()
-
     def __init_order_list(self):
         self._entry_order_list.clear()
         orders = self._api.activeOrders(self._symbol)
@@ -162,6 +152,16 @@ class GMOCoinBot:
             if o_close:
                 self._api.cancel_orders(o_close)
                 sleep(1) # キャンセルまで時間かかるかもしれない、一応
+
+    def get_state(self) -> EBotState:
+        return self._state
+
+    def __set_state(self, state: EBotState):
+        print("Set Bot State to:", state)
+        self._state = state
+
+    def update_positions(self):
+        self._init_position_list()
 
     def get_server_status(self):
         return self._api.status()['status']
