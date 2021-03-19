@@ -232,9 +232,7 @@ class GMOCoinBot:
             self.close_positions(POSITION_TYPE_BUY)
 
     def is_position_timeout(self, position: Position):
-        keep_time_sec = position.get_keep_time().seconds
-        if keep_time_sec > self.params.max_keep_time:
-            print(keep_time_sec, position.timestamp)
+        keep_time_sec = abs(position.get_keep_time().total_seconds())
         return keep_time_sec > self.params.max_keep_time
 
     def should_exit(self, position: Position):
@@ -243,7 +241,10 @@ class GMOCoinBot:
 
         if (position.type == POSITION_TYPE_BUY and self.chart.get_last_candle().is_down()) or \
             (position.type == POSITION_TYPE_SELL and self.chart.get_last_candle().is_up()):
-            return position.profit_rate > 0
+            return position.profit_rate > self.params.second_profit_rate
+
+        if self.is_position_timeout(position):
+            return True
 
         return False
 
@@ -281,7 +282,7 @@ class GMOCoinBot:
             for o in executing_orders:
                 order_time = pd.to_datetime(o['timestamp'])
                 now = datetime.now(tz=order_time.tzinfo)
-                if (now - order_time).seconds > ORDER_LIMIT_TIME:
+                if abs((now - order_time).total_seconds()) > ORDER_LIMIT_TIME:
                     cancel_ids.append(o['orderId'])
 
         if self._entry_order_list:
