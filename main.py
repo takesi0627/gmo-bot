@@ -25,10 +25,9 @@ def check_server_status():
             elif bot.get_state() == EBotState.Paused and bot.get_server_status() == 'OPEN':
                 bot.run()
 
-@tl.job(interval=timedelta(minutes=1))
-def monitoring():
-    chart.print_candles_by_index(-20)
-    print("RSI:", chart.rsi)
+# @tl.job(interval=timedelta(minutes=1))
+# def monitoring():
+#     chart.print_candles_by_index(-20)
 
 if __name__ == '__main__':
     if len(sys.argv) < 3:
