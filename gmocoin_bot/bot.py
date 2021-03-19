@@ -323,7 +323,10 @@ class GMOCoinBot:
         含み損益を含めた現在の残高
         :return:
         """
-        return int(self._api.account_margin()['actualProfitLoss'])
+        if self.get_server_status() == 'OPEN':
+            return int(self._api.account_margin()['actualProfitLoss'])
+        else:
+            return 0
 
     def get_profit_rate(self):
         return self.profit_sum / self.init_jpy
