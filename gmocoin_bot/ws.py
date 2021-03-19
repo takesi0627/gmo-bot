@@ -47,8 +47,8 @@ class GMOWebsocketManager:
                 sleep(WEBSOCKET_CALL_WAIT_TIME)
 
     def __setup_timer(self):
-        # 1分ごとにwebソケットの状態を確認
-        schedule.every(1).minutes.do(self._connect)
+        # 5秒ごとにwebソケットの状態を確認
+        schedule.every(5).seconds.do(self._connect)
         # 50分ごとにトークンの延長
         schedule.every(50).minutes.do(self._extend_token)
 
