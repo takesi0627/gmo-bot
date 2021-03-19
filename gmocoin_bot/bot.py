@@ -123,8 +123,9 @@ class GMOCoinBot:
         self._setup_timer()
 
     def _setup_timer(self):
-        schedule.every(5).minutes.do(self.update_positions)
-        schedule.every(5).minutes.do(self.cancel_order_check)
+        schedule.every(1).minutes.do(self.cancel_order_check)
+        schedule.every(3).minutes.do(self.update_positions)
+        schedule.every(5).minutes.do(self.__init_order_list)
 
     def run(self):
         self.init_jpy = self.get_balance()
