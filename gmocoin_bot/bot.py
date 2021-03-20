@@ -19,7 +19,8 @@ from chart.chart import *
 3. 時間間隔毎に保有ポジションの数を確認し、最大保有数以下であればトレンドを判断し、best_ask で購入/best_bidで売り注文を出す
 """
 
-WEBSOCKET_CALL_WAIT_TIME = 3
+DEFAULT_INIT_JPY = 50000
+
 ORDER_LIMIT_TIME = 60
 
 POSITION_TYPE_BUY = 'BUY'
@@ -55,10 +56,10 @@ class Position(gmo.Position):
     def execute_report(self):
         keep_time = self.get_keep_time()
         if self.type == POSITION_TYPE_BUY:
-            return str.format("[BUY: {:.0f} -> SELL: {:.0f}][KEEP TIME: {}:{}] 損益：{:+.0f}",
+            return str.format("[B({:.0f}) -> S({:.0f})][KEEP TIME: {}:{}] 損益：{:+.0f}",
                               self.price, self.curr_price, int(keep_time.seconds / 60), keep_time.seconds % 60, self.lossGain)
         elif self.type == POSITION_TYPE_SELL:
-            return str.format("[SELL: {:.0f} -> BUY: {:.0f}][KEEP TIME: {}:{}] 損益：{:+.0f}",
+            return str.format("[S({:.0f}) -> B({:.0f})][KEEP TIME: {}:{}] 損益：{:+.0f}",
                               self.price, self.curr_price, int(keep_time.seconds / 60), keep_time.seconds % 60, self.lossGain)
 
     def entry_report(self):
@@ -83,7 +84,7 @@ class EBotState(Enum):
 
 class GMOCoinBot:
     _position_list: List[Position]
-    _prev_entry_time: datetime = None
+    _prev_entry_time: datetime or None
     _entry_order_list: List[int]
     _state = EBotState
 
@@ -111,10 +112,7 @@ class GMOCoinBot:
         self._prev_entry_time = None
 
         # 分析用
-        self.win_num = 0
-        self.trade_num = 0
-        self.init_jpy = 0
-        self.profit_sum = 0 # 決済済みの利益総和
+        self._analyzer = Analyzer(GMOCoinBot.get_balance(self))
         log_path = "trade.{}.{}.log".format(bot_config['name'], datetime.now().strftime("%Y%m%d%H%M%S"))
 
         self.__logger = Logger(log_path)
@@ -126,8 +124,6 @@ class GMOCoinBot:
         schedule.every(5).minutes.do(self.__init_order_list)
 
     def run(self):
-        self.init_jpy = self.get_balance()
-
         # ポジション、注文の初期状態を取得
         self.__init_order_list()
         self._init_position_list()
@@ -175,14 +171,11 @@ class GMOCoinBot:
                 self._entry_order_list.remove(order_id)
         elif settle_type == 'CLOSE':
             lossGain = int(execution_data['lossGain'])
-            if lossGain > 0:
-                self.win_num += 1
-            self.trade_num += 1
-            self.profit_sum += lossGain
             close_pos = self.get_position(execution_data['positionId'])
             if close_pos:
                 self._position_list.remove(close_pos)
                 close_pos.lossGain = lossGain
+                self._analyzer.update(close_pos)
                 self.report(close_pos)
 
             self._prev_entry_time = None
@@ -321,18 +314,15 @@ class GMOCoinBot:
         含み損益を含めた現在の残高
         :return:
         """
-        if self.get_server_status() == 'OPEN':
+        if self._api.status()['status'] == 'OPEN':
             return int(self._api.account_margin()['actualProfitLoss'])
         else:
-            return 0
-
-    def get_profit_rate(self):
-        return self.profit_sum / self.init_jpy
+            return DEFAULT_INIT_JPY
 
     def report(self, p: Position):
-        self.__logger.log("[{}]{} 勝率[{:.2%}] 時価評価総額: {:.0f} 利回り[{:+.0f} {:.2%}]".format(
-            datetime.now().strftime("%m-%d %H:%M:%S"), p.execute_report(), self.win_num / self.trade_num, self.get_balance(), self.profit_sum, self.get_profit_rate()
-        ))
+        self.__logger.log("[{}]{} {} 時価評価総額: {:.0f}".format(
+            datetime.now().strftime("%m-%d %H:%M:%S"), p.execute_report(), self._analyzer.report_str(), self.get_balance())
+        )
 
 class Logger:
     LOG_DIR = 'logs'
@@ -348,3 +338,37 @@ class Logger:
     def log(self, output_str):
         with open(self.__filepath, 'a') as f:
             print(output_str, file=f)
+
+class Analyzer:
+    def __init__(self, init_jpy):
+        self.init_jpy = init_jpy
+        self.trade_num = 0
+        self.win_num = 0
+        self.total_loss = 0
+        self.total_gain = 0
+
+    def expect_value(self):
+        avg_gain = 0
+        if self.total_gain > 0:
+            avg_gain = self.total_gain / self.win_num
+        avg_loss = self.total_loss / (self.trade_num - self.win_num)
+        win_percentage = self.win_num / self.trade_num
+        return avg_gain * win_percentage + avg_loss * (1 - win_percentage)
+
+    def loss_gain(self):
+        return self.total_gain + self.total_loss
+
+    def get_profit_rate(self):
+        return self.loss_gain() / self.init_jpy
+
+    def update(self, execute_position:Position):
+        if execute_position.lossGain >= 0:
+            self.win_num += 1
+            self.total_gain += int(execute_position.lossGain)
+        else:
+            self.total_loss += int(execute_position.lossGain)
+
+        self.trade_num += 1
+
+    def report_str(self):
+        return "期待値[{:.0f}] 利回り[{:+.0f} {:.2%}]".format(self.expect_value(), self.loss_gain(), self.get_profit_rate())

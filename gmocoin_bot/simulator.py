@@ -1,32 +1,18 @@
 import random
-from os.path import exists
-
-from gmo.gmo import PositionJSONEncoder
 from gmocoin_bot.bot import *
 
 class GMOCoinBotSimulator(GMOCoinBot):
     LEVERAGE_RATE = 4
     SAVE_PATH = 'simulator_save.json'
     def __init__(self, config_path, api, chart):
-        self.curr_jpy = 0
         super().__init__(config_path, api, chart)
-        self.init_jpy = int(self._api.account_margin()['actualProfitLoss'])
-        self.curr_jpy = self.init_jpy
+        self.curr_jpy = super().get_balance()
 
     def _setup_timer(self):
         pass
 
     def _init_position_list(self):
         pass
-
-    def __save_data(self):
-        data = {
-            'positions': json.dumps(self._position_list, cls=PositionJSONEncoder),
-            'lossGain': self.profit_sum
-        }
-
-        with open(self.SAVE_PATH, 'w') as output:
-            json.dump(data, output)
 
     def entry_position(self, side, price, size):
         p = Position({
@@ -49,19 +35,13 @@ class GMOCoinBotSimulator(GMOCoinBot):
         self.curr_jpy -= (p.price * p.size) / LEVERAGE_RATE
         p.entry_report()
         self._prev_entry_time = datetime.now()
-        self.__save_data()
 
     def close_position(self, position:Position):
-        self.trade_num += 1
-        if position.lossGain >= 0:
-            self.win_num += 1
-
-        self.profit_sum += position.lossGain
+        self._analyzer.update(position)
         self.report(position)
         self.curr_jpy += position.lossGain + (position.price * position.size) / position.leverage
         self._position_list.remove(position)
         self._prev_entry_time = None
-        self.__save_data()
 
     def close_positions(self, p_type):
         for p in [p for p in self._position_list if p.type == p_type]:
