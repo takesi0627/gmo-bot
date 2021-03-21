@@ -161,6 +161,12 @@ class Candle:
         else:
             return "-"
 
+    def loss_gain_rate(self):
+        return (self.close - self.open) / self.open
+
+    def loss_gain(self):
+        return self.close - self.open
+
     def is_up(self):
         return self.close > self.open
 
