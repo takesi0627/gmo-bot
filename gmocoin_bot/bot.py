@@ -346,31 +346,23 @@ class Analyzer:
         self.init_jpy = init_jpy
         self.trade_num = 0
         self.win_num = 0
-        self.total_loss = 0
-        self.total_gain = 0
+        self.loss_gain = 0
 
     def expect_value(self):
-        avg_gain = 0
-        if self.total_gain > 0:
-            avg_gain = self.total_gain / self.win_num
-        avg_loss = self.total_loss / (self.trade_num - self.win_num)
-        win_percentage = self.win_num / self.trade_num
-        return avg_gain * win_percentage + avg_loss * (1 - win_percentage)
-
-    def loss_gain(self):
-        return self.total_gain + self.total_loss
+        return self.loss_gain / self.trade_num
 
     def get_profit_rate(self):
-        return self.loss_gain() / self.init_jpy
+        return self.loss_gain / self.init_jpy
+
+    def get_win_rate(self):
+        return self.win_num / self.trade_num
 
     def update(self, execute_position:Position):
         if execute_position.lossGain >= 0:
             self.win_num += 1
-            self.total_gain += int(execute_position.lossGain)
-        else:
-            self.total_loss += int(execute_position.lossGain)
 
+        self.loss_gain += int(execute_position.lossGain)
         self.trade_num += 1
 
     def report_str(self):
-        return "期待値[{:.0f}] 利回り[{:+.0f} {:.2%}]".format(self.expect_value(), self.loss_gain(), self.get_profit_rate())
+        return "期待値[{:.0f}] 取引数[{}/{}] 利回り[{:+.0f} {:.2%}]".format(self.expect_value(), self.win_num, self.trade_num, self.loss_gain, self.get_profit_rate())
