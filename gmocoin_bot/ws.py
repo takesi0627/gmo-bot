@@ -68,31 +68,34 @@ class GMOWebsocketManager:
                 continue
 
             if not ws or not ws.keep_running:
-                self._ws_list[channel] = self.__ws_subscribe(channel)
+                try:
+                    self._ws_list[channel] = self.__ws_subscribe(channel)
+                except TimeoutError or ConnectionError:
+                    if self._ws_list[channel] and not self._ws_list[channel].sock.closed():
+                        self._ws_list[channel].close()
+
+                    self._ws_list[channel] = None
 
         for b in [b for b in self._bots if b.get_state() != EBotState.Running]:
             b.run()
 
     def __ws_subscribe(self, channel) -> websocket.WebSocketApp or None:
-        try:
-            if channel == CHANNEL_NAME_TICKER:
-                ws = self._api.subscribe_public_ws(CHANNEL_NAME_TICKER, 'BTC_JPY', lambda _, message: self.__on_ticker(json.loads(message)))
-            elif channel == CHANNEL_NAME_TRADES:
-                ws = self._api.subscribe_public_ws(CHANNEL_NAME_TRADES, 'BTC_JPY', lambda _, message: self.__update_trades(json.loads(message)))
-            elif channel == CHANNEL_NAME_EXECUTION:
-                ws = self._api.subscribe_private_ws(self.__token, CHANNEL_NAME_EXECUTION, lambda _, message: self.__on_execution_events(json.loads(message)))
-            elif channel == CHANNEL_NAME_ORDER:
-                ws = self._api.subscribe_private_ws(self.__token, CHANNEL_NAME_ORDER, lambda _, message: self.__on_order_events(json.loads(message)))
-            elif channel == CHANNEL_NAME_POSITION:
-                ws = self._api.subscribe_private_ws(self.__token, CHANNEL_NAME_POSITION, lambda _, message: self.__on_position_events(json.loads(message)))
-            else:
-                return None
-
-            print("[{}] Subscribe [{}]".format(datetime.now(), channel))
-            sleep(WEBSOCKET_CALL_WAIT_TIME)  # 一秒間1回しか購読できないため
-            return ws
-        except ConnectionError:
+        if channel == CHANNEL_NAME_TICKER:
+            ws = self._api.subscribe_public_ws(CHANNEL_NAME_TICKER, 'BTC_JPY', lambda _, message: self.__on_ticker(json.loads(message)))
+        elif channel == CHANNEL_NAME_TRADES:
+            ws = self._api.subscribe_public_ws(CHANNEL_NAME_TRADES, 'BTC_JPY', lambda _, message: self.__update_trades(json.loads(message)))
+        elif channel == CHANNEL_NAME_EXECUTION:
+            ws = self._api.subscribe_private_ws(self.__token, CHANNEL_NAME_EXECUTION, lambda _, message: self.__on_execution_events(json.loads(message)))
+        elif channel == CHANNEL_NAME_ORDER:
+            ws = self._api.subscribe_private_ws(self.__token, CHANNEL_NAME_ORDER, lambda _, message: self.__on_order_events(json.loads(message)))
+        elif channel == CHANNEL_NAME_POSITION:
+            ws = self._api.subscribe_private_ws(self.__token, CHANNEL_NAME_POSITION, lambda _, message: self.__on_position_events(json.loads(message)))
+        else:
             return None
+
+        print("[{}] Subscribe [{}]".format(datetime.now(), channel))
+        sleep(WEBSOCKET_CALL_WAIT_TIME)  # 一秒間1回しか購読できないため
+        return ws
 
     def __update_trades(self, trade):
         self._chart.update(trade)
