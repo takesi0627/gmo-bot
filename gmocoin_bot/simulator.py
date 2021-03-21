@@ -6,7 +6,7 @@ class GMOCoinBotSimulator(GMOCoinBot):
     SAVE_PATH = 'simulator_save.json'
     def __init__(self, config_path, api, chart):
         super().__init__(config_path, api, chart)
-        self.curr_jpy = super().get_balance()
+        self.curr_jpy = self._analyzer.init_jpy
 
     def _setup_timer(self):
         pass
