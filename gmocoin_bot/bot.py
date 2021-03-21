@@ -7,7 +7,7 @@ from typing import List
 import schedule
 
 from chart import ETrendType
-from chart.trend import SimpleTrendChecker, RSITrendChecker
+from chart.trend import SimpleTrendChecker, RSITrendChecker, SimpleTrendChecker2
 from gmo import gmo
 from timeloop import Timeloop
 
@@ -95,8 +95,10 @@ class GMOCoinBot:
         self._api = api
         self.chart = in_chart
         checker_type = bot_config['trend_checker']['type']
-        if checker_type == 'Simple':
+        if checker_type == 'Simple1':
             self.trend_checker = SimpleTrendChecker()
+        elif checker_type == 'Simple2':
+            self.trend_checker = SimpleTrendChecker2()
         elif checker_type == 'RSI':
             params = bot_config['trend_checker']['params']
             self.trend_checker =  RSITrendChecker(params[0], params[1], params[2])
