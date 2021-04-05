@@ -6,6 +6,8 @@ from gmo import gmo
 from datetime import datetime
 
 class AutoBuyer:
+    SAVE_FILE_PATH = 'save/tsumitate-jpy-used.json'
+
     def __init__(self, config_path):
         config = json.load(open(config_path, 'r'))
 
@@ -16,23 +18,33 @@ class AutoBuyer:
         self.__gmo = gmo.GMO(access_key, secret_key)
         self._trade_setting_path = config['settings']
 
+        with open(self.SAVE_FILE_PATH, 'r') as f:
+            self.__jpy_used = json.load(f)
+
     def buy(self):
         print("==================================================")
         print(datetime.now())
-        trades = json.load(open(self._trade_setting_path))
+        with open(self._trade_setting_path) as f:
+            trades = json.load(f)
 
-        for t in trades:
-            symbol = t['symbol']
-            size = t['size']
-            balance = self.__gmo.account_margin()['availableAmount']
-            price = self.__gmo.tickcer(symbol)[0]['ask']
-            if balance < size * price:
-                continue
+            for t in trades:
+                symbol = t['symbol']
+                size = t['size']
+                balance = int(self.__gmo.account_margin()['availableAmount'])
+                price = float(self.__gmo.tickcer(symbol)[0]['ask'])
+                if balance < size * price:
+                    continue
 
-            self.__gmo.order(symbol, 'BUY', 'LIMIT', size, price, time_in_force='SOK', cancel_before=True)
-            print("BUY {} * {}".format(symbol, size))
+                self.__gmo.order(symbol, 'BUY', 'LIMIT', size, price)
+                print("BUY {} * {} at rate[{}]".format(symbol, size, price))
+                if self.__jpy_used[symbol]:
+                    self.__jpy_used[symbol] += int(price * size)
+                else:
+                    self.__jpy_used[symbol] = int(price * size)
 
-        # TODO 成約イベントを監視、成約したら平均レート計算
+                with open(self.SAVE_FILE_PATH, 'w') as f_save:
+                    f_save.write(json.dumps(self.__jpy_used))
+
         print("==================================================")
 
     async def run(self):
