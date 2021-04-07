@@ -19,11 +19,12 @@ class GMOWebsocketManager:
     _ws_list: dict[str, websocket.WebSocketApp or None]
     _bots: list[GMOCoinBot]
 
-    def __init__(self, bots, chart, api: GMO, sim_flg=True):
+    def __init__(self, bots, chart, api: GMO, sim_flg=True, symbol='BTC_JPY'):
         self._bots = bots
         self._chart = chart
         self._api = api
         self._sim_flg = sim_flg
+        self._symbol = symbol
         self.__token = api.get_ws_access_token()
         self._ws_list = {
             CHANNEL_NAME_TICKER: None,
@@ -40,7 +41,7 @@ class GMOWebsocketManager:
         for channel, ws in self._ws_list.items():
             if ws and ws.keep_running:
                 if channel in [CHANNEL_NAME_TICKER, CHANNEL_NAME_TRADES]:
-                    ws.send(json.dumps({"command": "unsubscribe", "channel": channel, "symbol": 'BTC_JPY'}))
+                    ws.send(json.dumps({"command": "unsubscribe", "channel": channel, "symbol": self._symbol}))
                 else:
                     ws.send(json.dumps({"command": "unsubscribe", "channel": channel}))
                 ws.close()
@@ -60,9 +61,6 @@ class GMOWebsocketManager:
         print("[{}] TOKEN EXTENDED".format(datetime.now()))
 
     def _connect(self):
-        if self._api.status()['status'] != 'OPEN':
-            return
-
         for channel, ws in self._ws_list.items():
             if channel in [CHANNEL_NAME_EXECUTION, CHANNEL_NAME_ORDER, CHANNEL_NAME_POSITION] and self._sim_flg:
                 continue
@@ -81,9 +79,9 @@ class GMOWebsocketManager:
 
     def __ws_subscribe(self, channel) -> websocket.WebSocketApp or None:
         if channel == CHANNEL_NAME_TICKER:
-            ws = self._api.subscribe_public_ws(CHANNEL_NAME_TICKER, 'BTC_JPY', lambda _, message: self.__on_ticker(json.loads(message)))
+            ws = self._api.subscribe_public_ws(CHANNEL_NAME_TICKER, self._symbol, lambda _, message: self.__on_ticker(json.loads(message)))
         elif channel == CHANNEL_NAME_TRADES:
-            ws = self._api.subscribe_public_ws(CHANNEL_NAME_TRADES, 'BTC_JPY', lambda _, message: self.__update_trades(json.loads(message)))
+            ws = self._api.subscribe_public_ws(CHANNEL_NAME_TRADES, self._symbol, lambda _, message: self.__update_trades(json.loads(message)))
         elif channel == CHANNEL_NAME_EXECUTION:
             ws = self._api.subscribe_private_ws(self.__token, CHANNEL_NAME_EXECUTION, lambda _, message: self.__on_execution_events(json.loads(message)))
         elif channel == CHANNEL_NAME_ORDER:

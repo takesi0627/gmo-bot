@@ -47,6 +47,7 @@ if __name__ == '__main__':
     config = json.load(open(config_path, 'r'))
     access_key = config['access_key']
     secret_key = config['secret_key']
+    symbol = config['symbol']
     api = GMO(access_key, secret_key)
     chart = TechnicalChart()
     bot_configs = config['bot_configs']
